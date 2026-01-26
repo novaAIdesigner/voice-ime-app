@@ -18,14 +18,38 @@ The Voice IME Application is a tool that allows users to input text using voice 
 
 ## Usage
 1. Run the application (Administrator privileges may be required).
-2. Hold **Space** to dictate:
-   - Captures active window screen & title.
-   - Connects to Realtime API.
-   - Streams audio.
-3. Release **Space**:
-   - Stops recording.
-   - The model (gpt-4o-realtime) processes audio + image context.
-   - Resulting text is injected into the active window.
+
+### Basic Operation
+- **Tap Space**: Types a normal space character.
+- **Hold Space**: Starts dictation. Release to finish.
+
+### Capabilities
+
+The app sends a **screenshot** of your active window to the AI along with your voice. This allows two powerful modes of interaction:
+
+#### 1. Direct Dictation
+Simply speak what you want to type. Use this for writing new content.
+- *Voice*: "Hello World"
+- *Output*: "Hello World"
+
+#### 2. Context-Aware Editing & Refinement
+You can **select text** (highlight it with your mouse) before holding Space. The AI will see the selection and can modify it based on your instructions. The generated text will automatically replace your selection.
+
+**Examples:**
+
+*   **Refining Text**:
+    1. Select a rough draft sentence: *"i dont wanna go today"*
+    2. Hold Space and say: *"Make this formal and polite."*
+    3. Result: *"I regret to inform you that I will be unable to attend today."*
+
+*   **Translation**:
+    1. Hold Space and say: *"Put it in Chinese. I dont like to go today"*
+    2. Result: The text is replaced with the Chinese translation.
+
+*   **Replying to Messages**:
+    1. Even without selecting, if you are in a chat app (like Teams or Discord), the AI sees the chat history from the screenshot.
+    2. Hold Space and say: *"Reply that I'm looking into it."*
+    3. Result: *"Thanks for the update, I'm looking into it right now."* (Contextually formatted)
 
 ## Requirements
 - Windows OS
