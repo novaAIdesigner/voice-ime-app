@@ -25,13 +25,15 @@ namespace VoiceImeApp.Services
         private string _logPath;
         private string _sessionLogFile;
         private bool _verboseMode; 
+        private string _systemInstructions;
 
-        public void Initialize(string endpoint, string apiKey, string deploymentName, string chatDeploymentName)
+        public void Initialize(string endpoint, string apiKey, string deploymentName, string systemInstructions)
         {
             // Realtime API endpoint format: wss://{resource}.openai.azure.com/openai/realtime?api-version=2024-10-01-preview&deployment={deployment}
             _endpoint = endpoint.Replace("https://", "wss://").Replace("http://", "ws://");
             _apiKey = apiKey;
             _deploymentName = deploymentName;
+            _systemInstructions = systemInstructions;
         }
 
         public void EnableDebugLogging(bool enabled, string path, bool verbose = false)
@@ -82,11 +84,7 @@ namespace VoiceImeApp.Services
                 type = "session.update",
                 session = new
                 {
-                    instructions = "You are an intelligent input method editor (IME). " +
-                                   "User is holding SPACE to dictate to an application. " +
-                                   "You will receive a screenshot and audio. " +
-                                   "Refine the audio content to fit the application context shown in the screenshot. " +
-                                   "Output ONLY the text to be typed. Format appropriately for the application type. " ,
+                    instructions = _systemInstructions,
                     modalities = new[] { "text" },
                     input_audio_format = "pcm16",
                     turn_detection = (object)null // Manual interaction

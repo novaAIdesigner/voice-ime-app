@@ -54,7 +54,7 @@ namespace VoiceImeApp
                 section["Endpoint"],
                 section["ApiKey"],
                 section["DeploymentName"],
-                null
+                section["SystemInstructions"]
             );
 
             // Enable service logging

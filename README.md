@@ -29,8 +29,42 @@ The Voice IME Application is a tool that allows users to input text using voice 
 
 ## Requirements
 - Windows OS
-- .NET 6.0 SDK
+- .NET 8.0 SDK
 - Azure OpenAI Service with **gpt-4o-realtime-preview** deployment.
+
+## Getting Started
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd voice-ime-app
+   ```
+
+2. **Configure Settings**  
+   Create `appsettings.json` from the template:
+   ```powershell
+   Copy-Item appsettings.template.json appsettings.json
+   ```
+   Open `appsettings.json` and fill in your `ApiKey` and `Endpoint`.
+
+3. **Build and Run**
+   ```powershell
+   dotnet restore
+   dotnet run
+   ```
+
+## Auto-Start Configuration (Optional)
+To start the app automatically when Windows starts:
+
+> **Recommendation**: Set `"DebugMode": false` in `appsettings.json` before enabling auto-start to prevent large log files from filling up your disk.
+
+1. Build the application (ensure you have an `.exe` generated):
+   ```powershell
+   dotnet build --configuration Release
+   ```
+2. Locate the executable (e.g., `bin\Release\net8.0-windows\VoiceImeApp.exe`).
+3. Press `Win + R`, type `shell:startup`, and press **Enter** to open the Startup folder.
+4. Create a **Shortcut** to `VoiceImeApp.exe` and place it in this folder.
 
 ## Project Structure
 ```
