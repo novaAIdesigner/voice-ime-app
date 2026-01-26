@@ -178,10 +178,19 @@ namespace VoiceImeApp
         private async void OnSpaceReleased(object sender, EventArgs e)
         {
             if (!_isRecording) return;
-            _isRecording = false;
+            
+            // Snapshot state to determine action immediately
+            bool wasDictating = _isDictating;
 
-            // Stop waiting for hold timeout
+            _isRecording = false;
             _holdCts?.Cancel();
+
+            // FAST PATH: Inject Space immediately if it wasn't a dictation
+            // Do this BEFORE stopping audio or cleaning up to minimize latency
+            if (!wasDictating)
+            {
+                 _textInjector.InjectText(" ");
+            }
             
             // Close debug stream
             _audioDebugStream?.Dispose();
@@ -189,14 +198,12 @@ namespace VoiceImeApp
 
             try
             {
-                // Stop Mic 
+                // Stop Mic (this has async overhead)
                 var remainingAudio = await _audioRecorder.StopRecordingAsync();
                 
-                if (!_isDictating)
+                if (!wasDictating)
                 {
-                    // Short Press - Just type space
                     Console.WriteLine("Short Press: Space");
-                    _textInjector.InjectText(" ");
                     return;
                 }
 
