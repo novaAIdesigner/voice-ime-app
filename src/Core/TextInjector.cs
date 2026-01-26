@@ -1,6 +1,8 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
+using System.Windows.Forms;
+using System.Threading;
 
 namespace VoiceImeApp.Core
 {
@@ -65,91 +67,94 @@ namespace VoiceImeApp.Core
             if (string.IsNullOrEmpty(text)) return;
 
             // Normalize line endings to \n
-            text = text.Replace("\r\n", "\n").Replace("\r", "\n");
-
-            var inputs = new List<INPUT>();
-
-            foreach (char c in text)
+            // NEW METHOD: Clipboard Paste (Ctrl+V) with Backup/Restore
+            // Run everything in a single STA thread to manage Clipboard ownership
+            Exception threadEx = null;
+            Thread staThread = new Thread(() =>
             {
-                if (c == 0 || c == 0xFEFF) continue; // Skip Null and BOM
-
-                if (c == '\n')
+                IDataObject backupData = null;
+                try
                 {
-                    // Send Enter Key (VK_RETURN = 0x0D) instead of unicode newline
-                    var enterDown = new INPUT
+                    // 1. Backup specific common formats (Text/Image) manually because legacy IDataObject 
+                    //    reference might become invalid once we overwrite the clipboard.
+                    //    However, simply holding the IDataObject reference is the standard attempt.
+                    //    We try to keep the data alive.
+                    var rawData = Clipboard.GetDataObject();
+                    if (rawData != null)
                     {
-                        type = INPUT_KEYBOARD,
-                        u = new InputUnion
-                        {
-                            ki = new KEYBDINPUT
-                            {
-                                wVk = 0x0D,
-                                wScan = 0,
-                                dwFlags = 0,
-                                time = 0,
-                                dwExtraInfo = IntPtr.Zero
-                            }
-                        }
-                    };
-
-                    var enterUp = new INPUT
-                    {
-                        type = INPUT_KEYBOARD,
-                        u = new InputUnion
-                        {
-                            ki = new KEYBDINPUT
-                            {
-                                wVk = 0x0D,
-                                wScan = 0,
-                                dwFlags = KEYEVENTF_KEYUP,
-                                time = 0,
-                                dwExtraInfo = IntPtr.Zero
-                            }
-                        }
-                    };
-                    inputs.Add(enterDown);
-                    inputs.Add(enterUp);
+                        // Create a fresh DataObject to hold the data in memory (Deep Copy for common types)
+                        backupData = new DataObject();
+                        // Copy common formats if present
+                        if (rawData.GetDataPresent(DataFormats.Text)) backupData.SetData(DataFormats.Text, rawData.GetData(DataFormats.Text));
+                        if (rawData.GetDataPresent(DataFormats.UnicodeText)) backupData.SetData(DataFormats.UnicodeText, rawData.GetData(DataFormats.UnicodeText));
+                        if (rawData.GetDataPresent(DataFormats.Bitmap)) backupData.SetData(DataFormats.Bitmap, rawData.GetData(DataFormats.Bitmap));
+                        if (rawData.GetDataPresent(DataFormats.Html)) backupData.SetData(DataFormats.Html, rawData.GetData(DataFormats.Html));
+                        // If it's something else (files, proprietary), we might lose it, but this covers 99% of text/image usage.
+                    }
                 }
-                else
+                catch { /* Ignore backup failures */ }
+
+                try
                 {
-                    var inputDown = new INPUT
+                    // 2. Set Clipboard to new text
+                    // Retry logic for clipboard locking
+                    bool clipboardSet = false;
+                    for (int i = 0; i < 5; i++)
                     {
-                        type = INPUT_KEYBOARD,
-                        u = new InputUnion
+                        try
                         {
-                            ki = new KEYBDINPUT
-                            {
-                                wVk = 0,
-                                wScan = c,
-                                dwFlags = KEYEVENTF_UNICODE,
-                                time = 0,
-                                dwExtraInfo = IntPtr.Zero
-                            }
+                            Clipboard.SetText(text);
+                            clipboardSet = true;
+                            break;
                         }
-                    };
+                        catch
+                        {
+                            Thread.Sleep(50);
+                        }
+                    }
 
-                    var inputUp = new INPUT
+                    if (!clipboardSet) throw new Exception("Could not lock clipboard.");
+
+                    // 3. Send Ctrl+V
+                    var inputs = new List<INPUT>();
+
+                    // Ctrl Down
+                    inputs.Add(new INPUT { type = INPUT_KEYBOARD, u = new InputUnion { ki = new KEYBDINPUT { wVk = 0x11, dwFlags = 0 } } });
+                    // V Down
+                    inputs.Add(new INPUT { type = INPUT_KEYBOARD, u = new InputUnion { ki = new KEYBDINPUT { wVk = 0x56, dwFlags = 0 } } });
+                    // V Up
+                    inputs.Add(new INPUT { type = INPUT_KEYBOARD, u = new InputUnion { ki = new KEYBDINPUT { wVk = 0x56, dwFlags = KEYEVENTF_KEYUP } } });
+                    // Ctrl Up
+                    inputs.Add(new INPUT { type = INPUT_KEYBOARD, u = new InputUnion { ki = new KEYBDINPUT { wVk = 0x11, dwFlags = KEYEVENTF_KEYUP } } });
+
+                    SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+
+                    // 4. Wait for Paste to complete
+                    Thread.Sleep(200); 
+
+                    // 5. Restore Clipboard
+                    if (backupData != null)
                     {
-                        type = INPUT_KEYBOARD,
-                        u = new InputUnion
+                        // Retry logic for restore
+                        for (int i = 0; i < 5; i++)
                         {
-                            ki = new KEYBDINPUT
-                            {
-                                wVk = 0,
-                                wScan = c,
-                                dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP,
-                                time = 0,
-                                dwExtraInfo = IntPtr.Zero
-                            }
+                            try { Clipboard.SetDataObject(backupData, true); break; } catch { Thread.Sleep(50); }
                         }
-                    };
-
-                    inputs.Add(inputDown);
-                    inputs.Add(inputUp);
+                    }
                 }
+                catch (Exception ex)
+                {
+                    threadEx = ex;
+                }
+            });
+            staThread.SetApartmentState(ApartmentState.STA);
+            staThread.Start();
+            staThread.Join();
+
+            if (threadEx != null)
+            {
+                Console.WriteLine($"[Error] Injection Failed: {threadEx.Message}");
             }
-
-            SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
         }
     }
 }
