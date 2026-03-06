@@ -1,6 +1,6 @@
 using System;
 
-namespace VoiceImeApp.Core
+namespace CopilotInput.Core
 {
     public class InputManager
     {

@@ -1,108 +1,93 @@
-# Voice IME Application
+# Copilot Input
 
-## Overview
-The Voice IME Application is a tool that allows users to input text using voice commands. It captures audio input, processes it through the Azure OpenAI API for transcription, and injects the transcribed text into the active input field. The application also supports taking screenshots of the current window.
+Version: 1.0
 
-## Features
-- Voice input for text transcription
-- Screenshot capture of the current window
-- Interaction with Azure OpenAI API (Whisper)
-- Global keyboard hook for SPACE key (Hold to dictate, Tap to space)
+## Product Value
+Copilot Input is a Windows voice-to-text assistant for real productivity workflows. It captures your speech, understands the on-screen context, and inserts or rewrites text in the active app.
+
+It is designed for users who frequently type in editors, documents, chat tools, and internal systems, and want faster drafting, rewriting, translation, and reply generation.
+
+## Core Features
+- **Hold-to-dictate trigger**: hold `CapsLock` to start, release to submit.
+- **Context-aware transcription**: combines microphone input with current window screenshot for better intent understanding.
+- **Direct text injection**: writes output into the currently focused input field.
+- **Selection-aware rewriting**: when text is selected, the result replaces the selection.
+- **Process filtering**: configurable allow/block process list to control where the hook is active.
+- **Realtime Azure OpenAI integration**: optimized for low-latency dictation and instruction-following edits.
+
+## Typical Value Scenarios
+
+### 1) Fast drafting
+- Speak directly to produce paragraphs, notes, tickets, or commit messages.
+- Ideal when typing speed is slower than speaking speed.
+
+Example:
+- Voice: “Draft a short status update: integration done, QA tomorrow, release on Friday.”
+- Result: a polished status update inserted into the active editor.
+
+### 2) Rewrite selected text
+- Select existing text, then give an instruction to improve tone, grammar, structure, or clarity.
+- Useful for polishing emails, PR descriptions, and documentation.
+
+Example:
+- Selected text: “we fixed most issue and maybe deploy tomrrow”
+- Voice: “Make this professional and concise.”
+- Result: rewritten professional sentence replacing the selection.
+
+### 3) Translation and localization
+- Dictate source text and request target language output.
+- Good for bilingual communication and localized drafts.
+
+Example:
+- Voice: “Translate to Chinese: Please review the attached proposal by end of day.”
+- Result: Chinese translation inserted in place.
+
+### 4) Contextual reply generation
+- In chat or ticket systems, dictate intent like “reply politely and ask for logs.”
+- Screenshot context helps generate a response aligned with the visible conversation.
 
 ## Configuration
-1. Open `appsettings.json`.
-2. Set your Azure OpenAI credentials for the **Realtime API**:
-   - `Endpoint`: Your Realtime API connection string.  
-     Example: `wss://<resource>.openai.azure.com/openai/realtime?api-version=2024-10-01-preview&deployment=gpt-4o-realtime-preview`
-   - `ApiKey`: Your API Key.
 
-## Usage
-1. Run the application (Administrator privileges may be required).
+Edit `appsettings.json`.
 
-### Basic Operation
-- **Tap Space**: Types a normal space character.
-- **Hold Space**: Starts dictation. Release to finish.
+### Required settings
+- `AzureOpenAI:Endpoint`
+- `AzureOpenAI:ApiKey`
+- `AzureOpenAI:DeploymentName`
 
-### Capabilities
+Example endpoint format:
+`wss://<resource>.openai.azure.com/openai/realtime?api-version=2024-10-01-preview&deployment=<deployment-name>`
 
-The app sends a **screenshot** of your active window to the AI along with your voice. This allows two powerful modes of interaction:
+### Common behavior settings
+- `Input:ActivationKeys`: trigger keys (default: `CapsLock`)
+- `Input:HoldToDictateThresholdMs`: hold threshold before dictation starts
+- `Input:AllowedProcesses`: whitelist of process names (`*` means all)
+- `Input:BlockedProcesses`: blacklist of process names
 
-#### 1. Direct Dictation
-Simply speak what you want to type. Use this for writing new content.
-- *Voice*: "Hello World"
-- *Output*: "Hello World"
+### Reliability recommendations
+- Run with administrator privileges if global hook does not work in elevated target apps.
+- Keep `AllowedProcesses` aligned with your daily tools to reduce unintended triggers.
 
-#### 2. Context-Aware Editing & Refinement
-You can **select text** (highlight it with your mouse) before holding Space. The AI will see the selection and can modify it based on your instructions. The generated text will automatically replace your selection.
+## Quick Start
+1. Create config from template:
+   - `Copy-Item appsettings.template.json appsettings.json`
+2. Fill Azure OpenAI credentials in `appsettings.json`.
+3. Build and run:
+   - `dotnet restore`
+   - `dotnet run`
 
-**Examples:**
+## Build (Release)
+- `dotnet build CopilotInput.sln -c Release`
 
-*   **Refining Text**:
-    1. Select a rough draft sentence: *"i dont wanna go today"*
-    2. Hold Space and say: *"Make this formal and polite."*
-    3. Result: *"I regret to inform you that I will be unable to attend today."*
+Release output:
+- `bin/Release/net8.0-windows/CopilotInput.exe`
 
-*   **Translation**:
-    1. Hold Space and say: *"Put it in Chinese. I dont like to go today"*
-    2. Result: The text is replaced with the Chinese translation.
-
-*   **Replying to Messages**:
-    1. Even without selecting, if you are in a chat app (like Teams or Discord), the AI sees the chat history from the screenshot.
-    2. Hold Space and say: *"Reply that I'm looking into it."*
-    3. Result: *"Thanks for the update, I'm looking into it right now."* (Contextually formatted)
+## Auto-start (Optional)
+1. Build Release.
+2. Open startup folder: `Win + R` → `shell:startup`
+3. Create a shortcut to `CopilotInput.exe` in that folder.
 
 ## Requirements
-- Windows OS
-- .NET 8.0 SDK
-- Azure OpenAI Service with **gpt-4o-realtime-preview** deployment.
-
-## Getting Started
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd voice-ime-app
-   ```
-
-2. **Configure Settings**  
-   Create `appsettings.json` from the template:
-   ```powershell
-   Copy-Item appsettings.template.json appsettings.json
-   ```
-   Open `appsettings.json` and fill in your `ApiKey` and `Endpoint`.
-
-3. **Build and Run**
-   ```powershell
-   dotnet restore
-   dotnet run
-   ```
-
-## Auto-Start Configuration (Optional)
-To start the app automatically when Windows starts:
-
-> **Recommendation**: Set `"DebugMode": false` in `appsettings.json` before enabling auto-start to prevent large log files from filling up your disk.
-
-1. Build the application (ensure you have an `.exe` generated):
-   ```powershell
-   dotnet build --configuration Release
-   ```
-2. Locate the executable (e.g., `bin\Release\net8.0-windows\VoiceImeApp.exe`).
-3. Press `Win + R`, type `shell:startup`, and press **Enter** to open the Startup folder.
-4. Create a **Shortcut** to `VoiceImeApp.exe` and place it in this folder.
-
-## Project Structure
-```
-voice-ime-app
-├── src
-│   ├── Core
-│   │   ├── KeyHook.cs          # Global Keyboard Hook (Space Key)
-│   │   ├── ScreenshotManager.cs# Active Window Capture
-│   │   └── TextInjector.cs     # SendInput (Unicode)
-│   ├── Services
-│   │   ├── AudioRecorder.cs    # NAudio Recording
-│   │   └── AzureOpenAIService.cs # OpenAI Whisper API Client
-│   ├── MainImeWrapper.cs       # Logic Orchestration
-│   └── Program.cs              # Entry Point
-├── appsettings.json
-└── VoiceImeApp.csproj
-```
+- Windows
+- .NET 8 SDK
+- Azure OpenAI resource with realtime deployment

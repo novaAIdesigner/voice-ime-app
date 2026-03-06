@@ -3,7 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using NAudio.Wave;
 
-namespace VoiceImeApp.Services
+namespace CopilotInput.Services
 {
     public class AudioRecorder
     {

@@ -8,7 +8,7 @@ using System.Text.Json;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 
-namespace VoiceImeApp.Services
+namespace CopilotInput.Services
 {
     public class AzureOpenAIService
     {

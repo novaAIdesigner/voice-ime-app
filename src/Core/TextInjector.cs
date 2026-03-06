@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Windows.Forms;
 using System.Threading;
 
-namespace VoiceImeApp.Core
+namespace CopilotInput.Core
 {
     public class TextInjector
     {
@@ -155,6 +155,31 @@ namespace VoiceImeApp.Core
             {
                 Console.WriteLine($"[Error] Injection Failed: {threadEx.Message}");
             }
+        }
+
+        public void InjectSpaceKey()
+        {
+            var inputs = new List<INPUT>
+            {
+                new INPUT
+                {
+                    type = INPUT_KEYBOARD,
+                    u = new InputUnion
+                    {
+                        ki = new KEYBDINPUT { wVk = (ushort)Keys.Space, dwFlags = 0 }
+                    }
+                },
+                new INPUT
+                {
+                    type = INPUT_KEYBOARD,
+                    u = new InputUnion
+                    {
+                        ki = new KEYBDINPUT { wVk = (ushort)Keys.Space, dwFlags = KEYEVENTF_KEYUP }
+                    }
+                }
+            };
+
+            SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
         }
     }
 }

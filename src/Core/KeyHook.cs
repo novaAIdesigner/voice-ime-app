@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using System.Threading;
 
-namespace VoiceImeApp.Core
+namespace CopilotInput.Core
 {
     public class KeyHook
     {
@@ -11,21 +14,45 @@ namespace VoiceImeApp.Core
         private const int WM_KEYDOWN = 0x0100;
         private const int WM_KEYUP = 0x0101;
         private const int WM_SYSKEYDOWN = 0x0104;
+        private const int WM_SYSKEYUP = 0x0105;
 
         private LowLevelKeyboardProc _proc;
         private IntPtr _hookID = IntPtr.Zero;
+        private int _activationIsDown;
+        private readonly HashSet<int> _activationVkCodes;
+        private readonly HashSet<int> _pressedActivationVkCodes;
+        private readonly object _pressedKeysLock = new object();
+        private readonly Func<bool> _shouldHandleActivation;
 
-        public event EventHandler SpacePressed;
-        public event EventHandler SpaceReleased;
+        public event EventHandler ActivationPressed;
+        public event EventHandler ActivationReleased;
 
-        public KeyHook()
+        public KeyHook(IEnumerable<Keys> activationKeys, Func<bool> shouldHandleActivation = null)
         {
             _proc = HookCallback;
+            _activationVkCodes = new HashSet<int>();
+            _pressedActivationVkCodes = new HashSet<int>();
+
+            foreach (var key in activationKeys)
+            {
+                _activationVkCodes.Add((int)key);
+            }
+
+            if (_activationVkCodes.Count == 0)
+            {
+                _activationVkCodes.Add((int)Keys.RShiftKey);
+            }
+
+            _shouldHandleActivation = shouldHandleActivation;
         }
 
         public void InstallHook()
         {
             _hookID = SetHook(_proc);
+            if (_hookID == IntPtr.Zero)
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "Failed to install keyboard hook.");
+            }
         }
 
         public void UninstallHook()
@@ -35,13 +62,35 @@ namespace VoiceImeApp.Core
 
         private IntPtr SetHook(LowLevelKeyboardProc proc)
         {
-            using (Process curProcess = Process.GetCurrentProcess())
-            using (ProcessModule curModule = curProcess.MainModule)
+            IntPtr hookId = IntPtr.Zero;
+
+            try
             {
-                return SetWindowsHookEx(WH_KEYBOARD_LL, proc, GetModuleHandle(curModule.ModuleName), 0);
+                using (Process curProcess = Process.GetCurrentProcess())
+                using (ProcessModule curModule = curProcess.MainModule)
+                {
+                    IntPtr moduleHandle = IntPtr.Zero;
+                    if (curModule != null)
+                    {
+                        moduleHandle = GetModuleHandle(curModule.ModuleName);
+                    }
+
+                    hookId = SetWindowsHookEx(WH_KEYBOARD_LL, proc, moduleHandle, 0);
+                }
             }
+            catch
+            {
+            }
+
+            if (hookId == IntPtr.Zero)
+            {
+                hookId = SetWindowsHookEx(WH_KEYBOARD_LL, proc, IntPtr.Zero, 0);
+            }
+
+            return hookId;
         }
 
+        #pragma warning disable CS0649
         private struct KBDLLHOOKSTRUCT
         {
             public int vkCode;
@@ -50,6 +99,8 @@ namespace VoiceImeApp.Core
             public int time;
             public IntPtr dwExtraInfo;
         }
+        #pragma warning restore CS0649
+
         private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
         private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
         {
@@ -63,18 +114,61 @@ namespace VoiceImeApp.Core
                     return CallNextHookEx(_hookID, nCode, wParam, lParam);
                 }
 
-                if (kbStruct.vkCode == (int)Keys.Space)
+                if (_activationVkCodes.Contains(kbStruct.vkCode))
                 {
-                    if (wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN)
+                    bool shouldHandle = _shouldHandleActivation?.Invoke() ?? true;
+                    bool isKeyDown = wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN;
+                    bool isKeyUp = wParam == (IntPtr)WM_KEYUP || wParam == (IntPtr)WM_SYSKEYUP;
+
+                    if (!shouldHandle)
                     {
-                        SpacePressed?.Invoke(this, EventArgs.Empty);
+                        if (isKeyUp)
+                        {
+                            lock (_pressedKeysLock)
+                            {
+                                _pressedActivationVkCodes.Remove(kbStruct.vkCode);
+                                if (_pressedActivationVkCodes.Count == 0)
+                                {
+                                    Interlocked.Exchange(ref _activationIsDown, 0);
+                                }
+                            }
+                        }
+                        return CallNextHookEx(_hookID, nCode, wParam, lParam);
                     }
-                    else if (wParam == (IntPtr)WM_KEYUP)
+
+                    if (isKeyDown)
                     {
-                        SpaceReleased?.Invoke(this, EventArgs.Empty);
+                        bool firstDown = false;
+                        lock (_pressedKeysLock)
+                        {
+                            if (_pressedActivationVkCodes.Add(kbStruct.vkCode) && _pressedActivationVkCodes.Count == 1)
+                            {
+                                firstDown = true;
+                            }
+                        }
+
+                        if (firstDown && Interlocked.Exchange(ref _activationIsDown, 1) == 0)
+                        {
+                            ActivationPressed?.Invoke(this, EventArgs.Empty);
+                        }
+                        return (IntPtr)1;
                     }
-                    // Swallow the key so it doesn't type a space
-                    return (IntPtr)1;
+
+                    if (isKeyUp)
+                    {
+                        bool allReleased = false;
+                        lock (_pressedKeysLock)
+                        {
+                            _pressedActivationVkCodes.Remove(kbStruct.vkCode);
+                            allReleased = _pressedActivationVkCodes.Count == 0;
+                        }
+
+                        if (allReleased && Interlocked.Exchange(ref _activationIsDown, 0) == 1)
+                        {
+                            ActivationReleased?.Invoke(this, EventArgs.Empty);
+                        }
+                        return (IntPtr)1;
+                    }
                 }
             }
             return CallNextHookEx(_hookID, nCode, wParam, lParam);

@@ -1,6 +1,6 @@
 using System;
 
-namespace VoiceImeApp.Services
+namespace CopilotInput.Services
 {
     public class TranscriptionProcessor
     {
