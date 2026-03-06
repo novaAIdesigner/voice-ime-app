@@ -22,6 +22,7 @@ namespace CopilotInput
         private readonly HashSet<string> _allowedProcesses;
         private readonly HashSet<string> _blockedProcesses;
         private readonly int _holdThresholdMs;
+        private readonly bool _singleTapCapsLockPassThrough;
 
         private bool _isRecording;
         private byte[] _lastScreenshot;
@@ -51,6 +52,7 @@ namespace CopilotInput
             _blockedProcesses = ParseProcessList(config["General:BlockedProcesses"]);
 
             var activationKeys = ParseActivationKeys(config["General:ActivationKeys"], config["General:ActivationKey"]);
+            _singleTapCapsLockPassThrough = activationKeys.Contains(Keys.Capital);
 
             if (_debugMode && !string.IsNullOrEmpty(_logPath))
             {
@@ -208,6 +210,11 @@ namespace CopilotInput
             {
                 if (!wasDictating)
                 {
+                    if (_singleTapCapsLockPassThrough)
+                    {
+                        _textInjector.InjectVirtualKeyPress(Keys.Capital);
+                    }
+
                     _audioDebugStream?.Dispose();
                     _audioDebugStream = null;
                     _statusTipNotifier.ShowReady();

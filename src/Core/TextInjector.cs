@@ -181,5 +181,31 @@ namespace CopilotInput.Core
 
             SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
         }
+
+        public void InjectVirtualKeyPress(Keys key)
+        {
+            var keyCode = (ushort)key;
+            var inputs = new List<INPUT>
+            {
+                new INPUT
+                {
+                    type = INPUT_KEYBOARD,
+                    u = new InputUnion
+                    {
+                        ki = new KEYBDINPUT { wVk = keyCode, dwFlags = 0 }
+                    }
+                },
+                new INPUT
+                {
+                    type = INPUT_KEYBOARD,
+                    u = new InputUnion
+                    {
+                        ki = new KEYBDINPUT { wVk = keyCode, dwFlags = KEYEVENTF_KEYUP }
+                    }
+                }
+            };
+
+            SendInput((uint)inputs.Count, inputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+        }
     }
 }
