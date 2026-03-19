@@ -55,6 +55,8 @@ Edit `appsettings.json`.
 - `AzureOpenAI:ApiKey`
 - `AzureOpenAI:DeploymentName`
 
+You can obtain the Azure OpenAI key and endpoint from `ai.azure.com`.
+
 Example endpoint format:
 `wss://<resource>.openai.azure.com/openai/realtime?api-version=2024-10-01-preview&deployment=<deployment-name>`
 
